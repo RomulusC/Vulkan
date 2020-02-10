@@ -1,68 +1,82 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include "log.h"
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
-const std::vector<const char*> validationLayers = 
+class HelloTriangleApplication
 {
-	"VK_LAYER_KHRONOS_validation"
-};
-
-class HelloTriangleApplication 
-{
+private:
+	GLFWwindow* m_window;
+	VkInstance m_vkInstance;
+	VkDebugUtilsMessengerEXT m_debugMessenger;
+	bool cleanupStarted;
 public:
-	void run() 
+	HelloTriangleApplication()
+		:
+		m_window(nullptr),		
+		cleanupStarted(true)
+	{}
+
+	bool isCleanupStarted() { return cleanupStarted; }
+	void emergencyCleanup()
+	{
+		cleanup();
+	}
+	void run()
 	{
 		initWindow();
 		initVulkan();
 		mainLoop();
 		cleanup();
 	}
-
 private:
-	GLFWwindow* window;
 
-	VkInstance instance;
-
-	void initWindow() 
+	void initWindow()
 	{
 		glfwInit();
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+		m_window = glfwCreateWindow(WIDTH, HEIGHT, "3D_Sandbox", nullptr, nullptr);
 	}
 
-	void initVulkan() 
+	void initVulkan()
 	{
 		createInstance();
+		setupDebugMessanger();
 	}
 
-	void mainLoop() 
+	void mainLoop()
 	{
-		while (!glfwWindowShouldClose(window)) 
+		while (!glfwWindowShouldClose(m_window))
 		{
 			glfwPollEvents();
 		}
 	}
 
-	void cleanup() 
+	void cleanup()
 	{
-		vkDestroyInstance(instance, nullptr);
+		cleanupStarted = true;
+#if _DEBUG
+		DestroyDebugUtilsMessengerEXT(m_vkInstance, m_debugMessenger, nullptr);
+#endif // _DEBUG
+		vkDestroyInstance(m_vkInstance, nullptr);
 
-		glfwDestroyWindow(window);
+		glfwDestroyWindow(m_window);
 
 		glfwTerminate();
 	}
 
-	void createInstance() 
+	void createInstance()
 	{
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -74,7 +88,12 @@ private:
 
 		VkInstanceCreateInfo createInfo = {};
 #if _DEBUG
-		if (!checkValidationLayerSupport())
+		// Enable Validation Layers
+		const std::vector<const char*> validationLayers =
+		{
+			"VK_LAYER_KHRONOS_validation"
+		};
+		if (!checkValidationLayerSupport(validationLayers))
 		{
 			throw std::runtime_error("validation layers requested, but not available!");
 		}
@@ -82,25 +101,73 @@ private:
 		createInfo.ppEnabledLayerNames = validationLayers.data();
 #else
 		createInfo.enabledLayerCount = 0;
-#endif
+#endif // _DEBUG
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		// GLFW Instance extensions request setup
+		std::vector<const char*> extensions = getRequiredExtensions();
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+		createInfo.ppEnabledExtensionNames = extensions.data();
 
-		createInfo.enabledExtensionCount = glfwExtensionCount;
-		createInfo.ppEnabledExtensionNames = glfwExtensions;
-
-		createInfo.enabledLayerCount = 0;
-
-		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) 
+		// Instance Creation
+		if (vkCreateInstance(&createInfo, nullptr, &m_vkInstance) != VK_SUCCESS)
 		{
 			throw std::runtime_error("failed to create instance!");
 		}
+#if _DEBUG
+		FLog(NULL,"VK_INSTANCE created!");
+#endif
 	}
-	bool checkValidationLayerSupport() 
+	void setupDebugMessanger()
+	{
+		VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+		createInfo.pfnUserCallback = debugCallback;
+		createInfo.pUserData = nullptr;
+		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+#if _DEBUG
+		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+									 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+								     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+								 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+								 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;		
+#else
+		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
+#endif // _DEBUG
+		VkResult result = CreateDebugUtilsMessengerEXT(m_vkInstance, &createInfo, nullptr, &m_debugMessenger);
+		if ( result != VK_SUCCESS) 
+		{			
+			throw FRuntimeErr("Failed to set up debug messanger! ERROR_C: {:d}", result);
+		}
+		cleanupStarted = false;
+		
+#if _DEBUG
+		FLog(0, "VK_DebugMessenger callback binded!");
+#endif // _DEBUG
+	}
+	VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+		if (func != nullptr) 
+		{
+			return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+		}
+		else 
+		{
+			return VK_ERROR_EXTENSION_NOT_PRESENT;
+		}
+	}
+	void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) 
+	{
+		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (func != nullptr) 
+		{
+			func(instance, debugMessenger, pAllocator);
+		}
+	}
+
+	bool checkValidationLayerSupport(const std::vector<const char*>& _validationLayers)
 	{
 		uint32_t layerCount;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -108,22 +175,68 @@ private:
 		std::vector<VkLayerProperties> availableLayers(layerCount);
 		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-		for (const char* layerName : validationLayers) {
+		for (const char* layerName : _validationLayers)
+		{
 			bool layerFound = false;
 
-			for (const auto& layerProperties : availableLayers) {
-				if (strcmp(layerName, layerProperties.layerName) == 0) {
+			for (const auto& layerProperties : availableLayers) 
+			{
+				if (strcmp(layerName, layerProperties.layerName) == 0)
+				{
 					layerFound = true;
 					break;
 				}
 			}
-
-			if (!layerFound) {
+			if (!layerFound) 
+			{
+				printf("Layer %s not found!\n", layerName);
 				return false;
 			}
 		}
-
 		return true;
+	}
+	std::vector<const char*> getRequiredExtensions()
+	{
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions;
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+#if _DEBUG
+		
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		
+#endif // _DEBUG
+		return extensions;
+	}
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT messageType,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData) 
+	{
+		int errortype = -1;
+		switch (messageSeverity)
+		{
+			case  VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+#if _DEBUG
+				|| VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+#endif // _DEBUG
+				:
+				errortype = 0;
+					break;
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+				errortype = 1;
+				break;			
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+				errortype = 2;
+				break;
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
+				errortype = 3;
+				break;
+		}
+		FLog(errortype, "{}", pCallbackData->pMessage);
+		return VK_FALSE;
 	}
 };
 
@@ -137,7 +250,11 @@ int main()
 	}
 	catch (const std::exception & e) 
 	{
-		std::cerr << e.what() << std::endl;
+		if (!app.isCleanupStarted())
+		{
+			app.emergencyCleanup();
+		}
+		FLog(3, "{}", e.what());
 		return EXIT_FAILURE;
 	}
 
