@@ -14,7 +14,8 @@
     <ClCompile Include="..\src\Application.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\log.h" />
+    <ClInclude Include="..\src\Core.h" />
+    <ClInclude Include="..\src\Log.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

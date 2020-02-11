@@ -1,12 +1,11 @@
+#include "Core.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 
 #include <iostream>
-#include <stdexcept>
 #include <cstdlib>
 #include <vector>
-#include "log.h"
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -95,7 +94,7 @@ private:
 		};
 		if (!checkValidationLayerSupport(validationLayers))
 		{
-			throw std::runtime_error("validation layers requested, but not available!");
+			RuntimeCrash("Validation layers requested, but not available!");
 		}
 		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 		createInfo.ppEnabledLayerNames = validationLayers.data();
@@ -111,12 +110,13 @@ private:
 		createInfo.ppEnabledExtensionNames = extensions.data();
 
 		// Instance Creation
-		if (vkCreateInstance(&createInfo, nullptr, &m_vkInstance) != VK_SUCCESS)
+		VkResult result = vkCreateInstance(&createInfo, nullptr, &m_vkInstance);
+		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("failed to create instance!");
+			RuntimeCrash("failed to create instance! {:d}", result);
 		}
 #if _DEBUG
-		FLog(NULL,"VK_INSTANCE created!");
+		Log(0,"VK_INSTANCE created!");
 #endif
 	}
 	void setupDebugMessanger()
@@ -139,12 +139,12 @@ private:
 		VkResult result = CreateDebugUtilsMessengerEXT(m_vkInstance, &createInfo, nullptr, &m_debugMessenger);
 		if ( result != VK_SUCCESS) 
 		{			
-			throw FRuntimeErr("Failed to set up debug messanger! ERROR_C: {:d}", result);
+			RuntimeCrash("Failed to set up debug messanger! ERROR_C: {:d}", result);
 		}
 		cleanupStarted = false;
 		
 #if _DEBUG
-		FLog(0, "VK_DebugMessenger callback binded!");
+		Log(0, "VK_DebugMessenger callback binded!");
 #endif // _DEBUG
 	}
 	VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
@@ -189,7 +189,7 @@ private:
 			}
 			if (!layerFound) 
 			{
-				printf("Layer %s not found!\n", layerName);
+				Log(3, "Validation layer {:s} not found!", layerName);
 				return false;
 			}
 		}
@@ -235,26 +235,19 @@ private:
 				errortype = 3;
 				break;
 		}
-		FLog(errortype, "{}", pCallbackData->pMessage);
+		Log(errortype, "{}", pCallbackData->pMessage);
 		return VK_FALSE;
 	}
 };
 
 int main() 
-{
+{	
 	HelloTriangleApplication app;
 
-	try 
+	app.run();
+	if (!app.isCleanupStarted())
 	{
-		app.run();
-	}
-	catch (const std::exception & e) 
-	{
-		if (!app.isCleanupStarted())
-		{
-			app.emergencyCleanup();
-		}
-		FLog(3, "{}", e.what());
+		app.emergencyCleanup();
 		return EXIT_FAILURE;
 	}
 

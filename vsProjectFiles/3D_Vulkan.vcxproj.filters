@@ -20,7 +20,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\log.h">
+    <ClInclude Include="..\src\Core.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\Log.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
