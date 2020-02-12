@@ -17,6 +17,7 @@ public:
 		switch (severity)
 		{
 			case 0:
+			default:
 			{
 				console->info(_fmt, _args...);
 				break;
@@ -35,12 +36,7 @@ public:
 			{
 				console->critical(_fmt, _args...);
 				break;
-			}
-			default:
-			{
-				console->info(_fmt, _args...);
-				break;
-			}
+			}			
 		}
 	}
 	
