@@ -18,6 +18,8 @@ private:
 	VkInstance m_vkInstance;
 	VkDebugUtilsMessengerEXT m_debugMessenger;
 	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+	VkDevice m_logicalDevice;
+	VkQueue m_graphicsQueue;
 public:
 	HelloTriangleApplication()
 		:
@@ -55,7 +57,7 @@ private:
 		createInstance();
 		setupDebugMessanger();
 		pickPhysicalDevice();
-		//findQueueFamilies(m_physicalDevice);
+		createLogicalDevice();
 		CLog(0, "initVulkan: success.");
 	}
 
@@ -70,6 +72,7 @@ private:
 
 	void cleanup()
 	{
+		vkDestroyDevice(m_logicalDevice, nullptr);
 #if _DEBUG
 		DestroyDebugUtilsMessengerEXT(m_vkInstance, m_debugMessenger, nullptr);
 #endif // _DEBUG
@@ -100,6 +103,42 @@ private:
 		CLog(0,"Selected: {}", deviceProperties.deviceName);
 #endif		
 	}
+	void createLogicalDevice()
+	{
+		QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		VkPhysicalDeviceFeatures deviceFeatures = {};
+
+		VkDeviceCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		createInfo.enabledExtensionCount = 0;
+
+		// Device specific validation layers are deprecated and the instance created layers are used instead, the following set up is for backwards compatibility. 
+#if _DEBUG
+		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledLayerNames = validationLayers.data();
+#else
+		createInfo.enabledLayerCount = 0;
+#endif
+
+		VkResult result = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_logicalDevice);
+		CVerifyCrash(result == VK_SUCCESS, "failed to create VK_LogicalDevice! {:d}", result);
+
+		vkGetDeviceQueue(m_logicalDevice, indices.isComplete(), 0, &m_graphicsQueue);
+
+		CLog(0, "VK_Device created!");
+	}
 	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphicsFamily;
@@ -108,6 +147,8 @@ private:
 			return this->graphicsFamily.emplace();
 		}
 	};
+
+	// Looks like a long winded way of getting a valid queueFamily, but it's necessary for a chapter in presentation.
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice _physicalDevice)
 	{
 		QueueFamilyIndices indices;
@@ -123,11 +164,8 @@ private:
 			if (queueFamilyVec[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
 				indices.graphicsFamily = i;
-			}
-			if (indices.isComplete())
-			{
 				break;
-			}
+			}			
 			i++;
 		}
 		return indices;
@@ -171,7 +209,11 @@ private:
 
 	}
 	*/
-	
+	// Enable Validation Layers
+	const std::vector<const char*> validationLayers =
+	{
+		"VK_LAYER_KHRONOS_validation"
+	};
 	void createInstance()
 	{
 		VkApplicationInfo appInfo = {};
@@ -187,11 +229,7 @@ private:
 		createInfo.pApplicationInfo = &appInfo;
 
 #if _DEBUG
-		// Enable Validation Layers
-		const std::vector<const char*> validationLayers =
-		{
-			"VK_LAYER_KHRONOS_validation"
-		};
+		
 		CVerifyCrash(checkValidationLayerSupport(validationLayers), "Validation layers requested, but not available!");
 		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 		createInfo.ppEnabledLayerNames = validationLayers.data();	
