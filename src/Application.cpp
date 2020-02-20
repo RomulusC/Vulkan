@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <vector>
 #include <map>
+#include <optional>
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -16,7 +17,7 @@ private:
 	GLFWwindow* m_window;
 	VkInstance m_vkInstance;
 	VkDebugUtilsMessengerEXT m_debugMessenger;
-	VkPhysicalDevice m_physicalDevice;
+	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 public:
 	HelloTriangleApplication()
 		:
@@ -54,13 +55,13 @@ private:
 		createInstance();
 		setupDebugMessanger();
 		pickPhysicalDevice();
+		//findQueueFamilies(m_physicalDevice);
 		CLog(0, "initVulkan: success.");
 	}
 
 	void mainLoop()
 	{
 		CLog(0, "mainloop: Start.");
-
 		while (!glfwWindowShouldClose(m_window))
 		{
 			glfwPollEvents();
@@ -95,10 +96,46 @@ private:
 		m_physicalDevice = candidates.rbegin()->second;
 #if _DEBUG
 		VkPhysicalDeviceProperties deviceProperties;
-		VkPhysicalDeviceFeatures deviceFeatures;
 		vkGetPhysicalDeviceProperties(m_physicalDevice, &deviceProperties);
 		CLog(0,"Selected: {}", deviceProperties.deviceName);
 #endif		
+	}
+	struct QueueFamilyIndices
+	{
+		std::optional<uint32_t> graphicsFamily;
+		bool isComplete()
+		{
+			return this->graphicsFamily.emplace();
+		}
+	};
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice _physicalDevice)
+	{
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamilyCount;
+		vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilyVec(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(_physicalDevice, &queueFamilyCount, queueFamilyVec.data());
+
+		for (uint32_t i = 0; i< queueFamilyVec.size(); i++)
+		{
+			if (queueFamilyVec[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				indices.graphicsFamily = i;
+			}
+			if (indices.isComplete())
+			{
+				break;
+			}
+			i++;
+		}
+		return indices;
+	}
+	bool isDeviceSuitable(VkPhysicalDevice _physicalDevice)
+	{
+		QueueFamilyIndices indicies = findQueueFamilies(_physicalDevice);
+		return indicies.isComplete();
 	}
 
 	uint32_t rateDeviceSuitability(const VkPhysicalDevice& _device)
@@ -203,11 +240,11 @@ private:
 		createInfo.flags = (VkFlags)0;
 #if _DEBUG
 		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+									 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+									 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT   ;
+		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT    |
+								 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+								 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #else
 		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;

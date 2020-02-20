@@ -1,11 +1,16 @@
 #pragma once
 #include "log.h"
 
-#define CLog(severity, ...) Logging::instance().writeLog(severity, __VA_ARGS__)
-#define CRuntimeCrash(...) abortImpl(__FILE__, __LINE__, __VA_ARGS__); ::abort()
-#define CBreakpoint(...) breakpointImpl(__VA_ARGS__); __debugbreak() 
-#define CVerify(_bVerify,...) verifyBreakImpl(_bVerify, 1, __VA_ARGS__);
-#define CVerifyCrash(_bVerify,...) verifyAbortImpl(__FILE__, __LINE__, _bVerify, 3, __VA_ARGS__);
+#define CLog(severity, ...)			Logging::instance().writeLog(severity, __VA_ARGS__)
+#define CRuntimeCrash(...)			abortImpl(__FILE__, __LINE__, __VA_ARGS__); ::abort()
+#define CBreakpoint(...)			breakpointImpl(__VA_ARGS__); __debugbreak() 
+#define CVerify(_bVerify,...)		verifyBreakImpl(_bVerify, 1, __VA_ARGS__);
+#define CVerifyCrash(_bVerify,...)  verifyAbortImpl(__FILE__, __LINE__, _bVerify, 3, __VA_ARGS__);
+#if _DEBUG
+#define CDebugLog(severity, ...) CLog(severity, __VA_ARGS__)
+#else
+#define CDebugLog(severity, ...) 
+#endif
 
 template<typename... T>
 void abortImpl(const char* _str, int _line, const char* _fmt, const T& ..._args)
