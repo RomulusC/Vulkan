@@ -98,6 +98,8 @@ private:
 	{
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(m_vkInstance, &deviceCount,nullptr);
+		CVerifyCrash(deviceCount != 0, "Failed to obtain physical devices.");
+
 		std::vector<VkPhysicalDevice> devices(deviceCount);
 		vkEnumeratePhysicalDevices(m_vkInstance, &deviceCount, devices.data());
 
@@ -105,9 +107,12 @@ private:
 		
 		for (const auto& device : devices)
 		{
-			candidates.emplace(rateDeviceSuitability(device), device);
+			if (isDeviceSuitable(device))
+			{
+				candidates.emplace(rateDeviceSuitability(device), device);
+			}
 		}
-		CVerifyCrash(candidates.size() != 0, "No valid Physical Devices found!");
+		CVerifyCrash(candidates.size() != 0, "No suitable Physical Devices found!");
 		m_physicalDevice = candidates.rbegin()->second;
 #if _DEBUG
 		VkPhysicalDeviceProperties deviceProperties;
@@ -208,7 +213,71 @@ private:
 	bool isDeviceSuitable(VkPhysicalDevice _physicalDevice)
 	{
 		QueueFamilyIndices indicies = findQueueFamilies(_physicalDevice);
-		return indicies.isComplete();
+		
+		return indicies.isComplete() && checkDeviceExtentionSupport(_physicalDevice);
+	}
+	class CheckExtentionHelperClass
+	{
+	public:
+		CheckExtentionHelperClass(const std::vector<const char*>& _vec)
+			: deviceExtensions(_vec), bfoundExtents(std::vector<bool>(_vec.size(), false))
+		{}
+		void changeBTrue(uint32_t i)
+		{
+			bfoundExtents[i] = true;
+		}
+		void setIfAllFound()
+		{
+			for (auto bfextent : bfoundExtents)
+			{
+				if (bfextent == false)
+				{
+					m_isAllFound = false;
+					return;
+				}
+			}
+			m_isAllFound = true;
+		}
+		bool isAllFound()
+		{
+			setIfAllFound();
+			return m_isAllFound;
+		}
+
+		const std::vector<const char*>& deviceExtensions;
+	private:
+		bool m_isAllFound;
+		std::vector<bool> bfoundExtents;
+	};
+	bool checkDeviceExtentionSupport(VkPhysicalDevice _physicalDevice)
+	{
+		const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }; // Add desired extentions here
+		CheckExtentionHelperClass extentHelp(deviceExtensions);
+		
+
+		uint32_t extentionCount;
+		vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extentionCount, nullptr);
+
+		std::vector<VkExtensionProperties> availableExtentions(extentionCount);
+		vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extentionCount, availableExtentions.data());
+
+		
+		for (auto avExt : availableExtentions)
+		{
+			for (uint32_t i = 0; i < extentHelp.deviceExtensions.size(); i++)
+			{
+				if (strcmp(avExt.extensionName, deviceExtensions[i]) == 0)
+				{
+					extentHelp.changeBTrue(i);
+				}
+			}
+			if (extentHelp.isAllFound())
+			{
+				return true;
+			}
+		}	
+
+		return false;		
 	}
 
 	uint32_t rateDeviceSuitability(const VkPhysicalDevice& _device)
