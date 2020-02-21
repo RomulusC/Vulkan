@@ -25,6 +25,9 @@ private:
 	VkQueue m_graphicsQueue; 
 	VkQueue m_presentQueue; // presentation queue
 	VkSurfaceKHR m_surface;
+
+	const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }; // Add desired extensions here
+
 public:
 	HelloTriangleApplication()
 		:
@@ -148,7 +151,8 @@ private:
 		createInfo.pQueueCreateInfos = queueCreateInfos.data();
 		createInfo.pEnabledFeatures = &deviceFeatures;
 
-		createInfo.enabledExtensionCount = 0;
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 		// Device specific validation layers are deprecated and the instance created layers are used instead, the following set up is for backwards compatibility. 
 #if _DEBUG
@@ -216,10 +220,10 @@ private:
 		
 		return indicies.isComplete() && checkDeviceExtentionSupport(_physicalDevice);
 	}
-	class CheckExtentionHelperClass
+	struct CheckExtentionHelper
 	{
 	public:
-		CheckExtentionHelperClass(const std::vector<const char*>& _vec)
+		CheckExtentionHelper(const std::vector<const char*>& _vec)
 			: deviceExtensions(_vec), bfoundExtents(std::vector<bool>(_vec.size(), false))
 		{}
 		void changeBTrue(uint32_t i)
@@ -251,8 +255,7 @@ private:
 	};
 	bool checkDeviceExtentionSupport(VkPhysicalDevice _physicalDevice)
 	{
-		const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }; // Add desired extentions here
-		CheckExtentionHelperClass extentHelp(deviceExtensions);
+		CheckExtentionHelper extentHelp(deviceExtensions);
 		
 
 		uint32_t extentionCount;
@@ -300,19 +303,7 @@ private:
 
 		return score;
 	}
-	/*
-	bool isDeviceSuitable(VkPhysicalDevice& _device)
-	{
-		VkPhysicalDeviceProperties deviceProperties;
-		VkPhysicalDeviceFeatures deviceFeatures;
-		vkGetPhysicalDeviceProperties(_device, &deviceProperties);
-		vkGetPhysicalDeviceFeatures(_device, &deviceFeatures);
-		
-		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-			   deviceFeatures.geometryShader;
 
-	}
-	*/
 	// Enable Validation Layers
 	const std::vector<const char*> validationLayers =
 	{
@@ -343,8 +334,7 @@ private:
 		createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
 #else
 		createInfo.enabledLayerCount = 0;
-#endif // _DEBUG
-		
+#endif // _DEBUG		
 
 		// GLFW Instance extensions request setup
 		std::vector<const char*> extensions = getRequiredExtensions();

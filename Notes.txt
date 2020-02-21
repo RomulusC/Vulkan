@@ -1,1 +1,3 @@
 git clean -fdx
+
+Current project only supports windows, please downlaod latest version of vulkan https://vulkan.lunarg.com/sdk/home#windows and set it into the default directory. 
