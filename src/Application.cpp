@@ -18,19 +18,20 @@ const int HEIGHT = 600;
 class HelloTriangleApplication
 {
 private:
-	GLFWwindow* m_window;
-	VkInstance m_vkInstance;
+	GLFWwindow* m_window; // the window "handle"
+	VkInstance m_vkInstance; // Vulkan works of instances
 	VkDebugUtilsMessengerEXT m_debugMessenger;
 	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 	VkDevice m_logicalDevice = VK_NULL_HANDLE;
-	VkQueue m_graphicsQueue; 
-	VkQueue m_presentQueue; // presentation queue
-	VkSurfaceKHR m_surface;
+	VkQueue m_graphicsQueue;	// graphics queue
+	VkQueue m_presentQueue;		// presentation queue
+	VkSurfaceKHR m_surface;		// rendering window view
 
-	std::vector<VkImage> m_swapChainImages;
-	VkSwapchainKHR m_swapChain;
-	VkFormat m_swapChainImageFormat;
-	VkExtent2D m_swapChainExtent;
+	std::vector<VkImage> m_swapChainImages;			// each individual image
+	VkSwapchainKHR m_swapChain;						// queues of images that are awaiting to be drawn on screen, synchronize with refresh rate of the screen.
+	VkFormat m_swapChainImageFormat;				// color format and colorSpace (linear or non-linear gamma)
+	VkExtent2D m_swapChainExtent;					// "extents" of the buffer. (width and height of the surface
+	std::vector<VkImageView> m_swapChainImageViews; // schematic on how to access a single image on the swap chain
 
 	const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }; // Add desired extensions here
 
@@ -72,7 +73,36 @@ private:
 		pickPhysicalDevice();
 		createLogicalDevice();
 		createSwapChain();
+		createImageViews();
 		CLog(0, "initVulkan: Success.");
+	}
+	void createImageViews()
+	{
+		m_swapChainImageViews.resize(m_swapChainImages.size());
+		for (size_t i = 0; i < m_swapChainImages.size(); i++)
+		{
+			VkImageViewCreateInfo createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			createInfo.image = m_swapChainImages[i];
+
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.format = m_swapChainImageFormat;
+
+			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = 1;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+
+			VkResult result = vkCreateImageView(m_logicalDevice, &createInfo, nullptr, &m_swapChainImageViews[i]);
+			CVerifyCrash(result == VK_SUCCESS, "Failed to create Image view for index: {}. Result: {}", i, result);
+		}
+
 	}
 
 	void createSwapChain()
@@ -146,6 +176,11 @@ private:
 
 	void cleanup()
 	{
+		for (auto it : m_swapChainImageViews)
+		{
+			vkDestroyImageView(m_logicalDevice, it, nullptr);
+		}
+
 		vkDestroySwapchainKHR(m_logicalDevice, m_swapChain, nullptr);
 		vkDestroyDevice(m_logicalDevice, nullptr);
 #if _DEBUG
