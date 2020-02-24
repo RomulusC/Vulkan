@@ -26,11 +26,12 @@ void breakpointImpl(const char* _fmt, const T& ..._args)
 		CLog(3, _fmt, _args...);
 }
 template<typename... T>
-void verifyAbortImpl(const char* _file, int line, bool _verify, int _severity, const char* _fmt, const T& ..._args)
+void verifyAbortImpl(const char* _file, int _line, bool _verify, int _severity, const char* _fmt, const T& ..._args)
 {
 	if (!_verify)
 	{
-		CLog(_severity, "{} \n{:s}:{:d}",_fmt, _args..., _file, line);
+		CLog(_severity, _fmt, _args...);
+		Logging::instance().writeTrace(_severity, "{}:{}", _file, _line);
 		__debugbreak();
 		abort();
 	}
